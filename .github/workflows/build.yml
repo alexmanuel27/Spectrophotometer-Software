@@ -8,7 +8,7 @@ on:
   workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
 
 jobs:
-   build-windows:
+  build-windows:
     runs-on: windows-latest
     steps:
       - name: Checkout code
