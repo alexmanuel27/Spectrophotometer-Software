@@ -1,0 +1,22 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Se activa solo cuando subes un tag como v1.0.3
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 👈 Esto evita el error 403
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Release on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true  # GitHub genera notas automáticas
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
