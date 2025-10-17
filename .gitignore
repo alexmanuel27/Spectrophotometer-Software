@@ -1,0 +1,12 @@
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Binarios
+spectrophotometer
+spectrophotometer.exe
+
+# Entornos virtuales
+env/
+venv/
