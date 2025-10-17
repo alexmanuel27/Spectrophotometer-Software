@@ -1,4 +1,5 @@
 import serial
+import serial.tools.list_ports
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
@@ -21,18 +22,16 @@ def select_port_gui():
     label.pack(pady=10)
 
     def list_ports():
-        possible = ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyACM0', '/dev/ttyACM1']
-        available = []
-        for p in possible:
-            try:
-                s = serial.Serial(p)
-                s.close()
-                available.append(p)
-            except (OSError, serial.SerialException):
-                pass
-        if not available:
-            available = ["/dev/ttyUSB0"]
-        return available
+
+        puertos = []
+        for p in serial.tools.list_ports.comports():
+              # Incluir solo puertos que tengan un nombre descriptivo (evita falsos positivos)
+            if p.device:
+                puertos.append(p.device)
+        # Si no encuentra ninguno, añade opciones comunes como respaldo
+        if not puertos:
+            puertos = ['/dev/ttyUSB0', '/dev/ttyACM0']
+        return puertos
 
     ports = list_ports()
     selected_port = tk.StringVar(value=ports[0] if ports else "/dev/ttyUSB0")
