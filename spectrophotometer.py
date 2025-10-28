@@ -9,7 +9,16 @@ import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
 from matplotlib.widgets import Button
 
-# === SELECT SERIAL PORT WITH GUI ===
+# === CARGAR FACTOR DE CORRECCIÓN (si existe) ===
+CALIBRATION_FILE = "calibration_factor.npy"
+if os.path.exists(CALIBRATION_FILE):
+    CORRECTION_FACTOR = np.load(CALIBRATION_FILE)
+    print(f"✅ Factor de corrección cargado desde {CALIBRATION_FILE}")
+else:
+    CORRECTION_FACTOR = np.ones(18)
+    print("⚠️  No se encontró archivo de calibración. Usando factor = 1 (sin corrección).")
+
+# === SELECCIÓN DE PUERTO CON TKINTER ===
 def select_port_gui():
     root = tk.Tk()
     root.withdraw()
@@ -22,21 +31,20 @@ def select_port_gui():
     label.pack(pady=10)
 
     def list_ports():
-
-        puertos = []
+        ports = []
         for p in serial.tools.list_ports.comports():
-              # Incluir solo puertos que tengan un nombre descriptivo (evita falsos positivos)
             if p.device:
-                puertos.append(p.device)
-        # Si no encuentra ninguno, añade opciones comunes como respaldo
-        if not puertos:
-            puertos = ['/dev/ttyUSB0', '/dev/ttyACM0']
-        return puertos
+                ports.append(p.device)
+        if not ports:
+            ports = ['/dev/ttyUSB0', '/dev/ttyACM0']
+            if os.name == 'nt':
+                ports = ['COM1', 'COM2', 'COM3', 'COM4', 'COM5']
+        return ports
 
-    ports = list_ports()
-    selected_port = tk.StringVar(value=ports[0] if ports else "/dev/ttyUSB0")
+    available_ports = list_ports()
+    selected_port = tk.StringVar(value=available_ports[0] if available_ports else "/dev/ttyUSB0")
 
-    combo = ttk.Combobox(top, textvariable=selected_port, values=ports, state="readonly", width=30, font=("Helvetica", 11))
+    combo = ttk.Combobox(top, textvariable=selected_port, values=available_ports, state="readonly", width=30, font=("Helvetica", 11))
     combo.pack(pady=10)
 
     port = None
@@ -57,7 +65,7 @@ def select_port_gui():
     root.destroy()
     return port
 
-# === RUN PORT SELECTION ===
+# === EJECUTAR SELECCIÓN DE PUERTO ===
 try:
     port = select_port_gui()
     if not port:
@@ -70,7 +78,7 @@ except Exception as e:
 baud_rate = 115200
 timeout = 2
 
-# === SAVE FOLDERS ===
+# === CARPETAS DE GUARDADO ===
 base_folder = os.path.expanduser("~/Descargas")
 csv_folder = os.path.join(base_folder, "Spectra_Absorbance_CSV")
 png_folder = os.path.join(base_folder, "Spectra_Absorbance_PNG")
@@ -78,14 +86,14 @@ png_folder = os.path.join(base_folder, "Spectra_Absorbance_PNG")
 os.makedirs(csv_folder, exist_ok=True)
 os.makedirs(png_folder, exist_ok=True)
 
-# === EXACT WAVELENGTHS (AS7265x) ===
+# === LONGITUDES DE ONDA EXACTAS (AS7265x) ===
 wavelengths = [
     410, 435, 460, 485, 510, 535,
     560, 585, 610, 645, 680, 705,
     730, 760, 810, 860, 900, 940
 ]
 
-# === SERIAL CONNECTION ===
+# === CONEXIÓN SERIAL ===
 try:
     ser = serial.Serial(port, baud_rate, timeout=timeout)
     print(f"🔌 Connected to {port} at {baud_rate} bps")
@@ -93,14 +101,14 @@ except Exception as e:
     print(f"❌ Error opening serial port: {e}")
     exit(1)
 
-# === SYSTEM STATE ===
-reference = None       # I₀
-sample_intensity = None # I
+# === ESTADO DEL SISTEMA ===
+reference = None
+sample_intensity = None
 absorbance_values = None
 transmittance_percent = None
 count = 0
 
-# === HELPER FUNCTIONS ===
+# === FUNCIONES AUXILIARES ===
 def clear_buffer():
     while ser.in_waiting > 0:
         ser.readline()
@@ -114,7 +122,7 @@ def wait_for_confirmation(expected_text, timeout=5):
                 line = ser.readline().decode('utf-8', errors='ignore').strip()
                 if expected_text in line:
                     return True
-                if line.count(',') == 17:  # Ignore spectral data
+                if line.count(',') == 17:
                     continue
             except:
                 continue
@@ -162,7 +170,7 @@ def take_n_readings_average(n=10):
         plt.pause(0.1)
     return np.mean(readings, axis=0) if readings else None
 
-# === PLOT SETUP ===
+# === CONFIGURACIÓN DE LA GRÁFICA DOBLE ===
 plt.ion()
 fig, (ax_abs, ax_T) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [1, 1]})
 
@@ -181,10 +189,10 @@ ax_T.grid(True, alpha=0.3)
 ax_T.set_xlim(400, 960)
 ax_T.set_ylim(0, 100)
 
-fig.suptitle('🔬 Spectrophotometer - Dual View', fontsize=14, fontweight='bold')
+fig.suptitle('🔬 Spectrophotometer - Calibrated', fontsize=14, fontweight='bold')
 
-# === BUTTONS (repositioned below plots) ===
-ax_btn_ref = plt.axes([0.1, 0.02, 0.2, 0.05])     # [left, bottom, width, height]
+# === BOTONES ===
+ax_btn_ref = plt.axes([0.1, 0.02, 0.2, 0.05])
 btn_ref = Button(ax_btn_ref, 'Take Reference', color='skyblue')
 
 ax_btn_sample = plt.axes([0.35, 0.02, 0.2, 0.05])
@@ -193,7 +201,7 @@ btn_sample = Button(ax_btn_sample, 'Measure Sample', color='lightgreen')
 ax_btn_save = plt.axes([0.6, 0.02, 0.2, 0.05])
 btn_save = Button(ax_btn_save, 'Save', color='gold')
 
-# === BUTTON CALLBACKS ===
+# === FUNCIONES DE BOTONES ===
 def take_reference(event):
     global reference, absorbance_values, transmittance_percent
     absorbance_values = None
@@ -264,28 +272,34 @@ def measure_sample(event):
     I_safe = np.maximum(I, 1e-6)
     I0_safe = np.maximum(I0, I_safe)
 
-    A = np.log10(I0_safe / I_safe)
-    A = np.clip(A, 0, None)
+    # Calcular absorbancia original
+    A_raw = np.log10(I0_safe / I_safe)
+    A_raw = np.clip(A_raw, 0, None)
 
+    # Aplicar corrección espectral
+    A_corrected = A_raw * CORRECTION_FACTOR
+
+    # Calcular transmitancia %
     T_percent = (I_safe / I0_safe) * 100
     T_percent = np.clip(T_percent, 0, 100)
 
-    line_abs.set_ydata(A)
-    ax_abs.set_ylim(0, max(A)*1.2 or 2.0)
+    # Actualizar gráficas con absorbancia CORREGIDA
+    line_abs.set_ydata(A_corrected)
+    ax_abs.set_ylim(0, max(A_corrected)*1.2 or 2.0)
     ax_abs.relim(visible_only=True)
     ax_abs.autoscale_view(scalex=False, scaley=True)
-    ax_abs.set_title('Absorbance calculated', color='darkred')
+    ax_abs.set_title('Absorbance (calibrated)', color='darkred')
 
     line_T.set_ydata(T_percent)
     ax_T.set_ylim(0, 100)
     ax_T.relim(visible_only=True)
     ax_T.autoscale_view(scalex=False, scaley=True)
-    ax_T.set_title('Transmittance calculated', color='darkgreen')
+    ax_T.set_title('Transmittance', color='darkgreen')
 
-    absorbance_values = A
+    absorbance_values = A_corrected
     transmittance_percent = T_percent
     fig.canvas.draw_idle()
-    print("✅ Data updated.")
+    print("✅ Data updated (with calibration).")
 
 def save_data(event):
     global absorbance_values, transmittance_percent, reference, sample_intensity, count
@@ -310,12 +324,14 @@ def save_data(event):
     I0 = reference
     I = sample_intensity
 
-    A = np.log10(np.maximum(I0, 1e-6) / np.maximum(I, 1e-6))
-    A = np.clip(A, 0, None)
+    A_raw = np.log10(np.maximum(I0, 1e-6) / np.maximum(I, 1e-6))
+    A_raw = np.clip(A_raw, 0, None)
+    A_corrected = A_raw * CORRECTION_FACTOR
+
     T_percent = (I / I0) * 100
     T_percent = np.clip(T_percent, 0, 100)
 
-    # --- SAVE CSV ---
+    # --- GUARDAR CSV CON ABSORBANCIA CORREGIDA ---
     csv_path = os.path.join(csv_folder, f"{filename}.csv")
     with open(csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
@@ -323,23 +339,23 @@ def save_data(event):
             'Wavelength_nm',
             'I0_Reference_uW_per_cm2',
             'I_Sample_uW_per_cm2',
-            'Absorbance',
+            'Absorbance_Calibrated',
             'Transmittance_%'
         ])
-        for w, i0, i_samp, a, t in zip(wavelengths, I0, I, A, T_percent):
+        for w, i0, i_samp, a, t in zip(wavelengths, I0, I, A_corrected, T_percent):
             writer.writerow([w, round(i0, 4), round(i_samp, 4), round(a, 4), round(t, 2)])
     print(f"✅ CSV saved: {csv_path}")
 
-    # --- SAVE CLEAN PNG ---
+    # --- GUARDAR PNG LIMPIO ---
     png_path = os.path.join(png_folder, f"{filename}.png")
     fig_save, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
-    ax1.plot(wavelengths, A, 'o-', color='purple', linewidth=2, markersize=6)
-    ax1.set_ylabel('Absorbance')
+    ax1.plot(wavelengths, A_corrected, 'o-', color='purple', linewidth=2, markersize=6)
+    ax1.set_ylabel('Absorbance (calibrated)')
     ax1.set_title(f'Absorbance - {name}')
     ax1.grid(True, alpha=0.3)
     ax1.set_xlim(400, 960)
-    ax1.set_ylim(0, max(A)*1.2 or 2.0)
+    ax1.set_ylim(0, max(A_corrected)*1.2 or 2.0)
 
     ax2.plot(wavelengths, T_percent, 's-', color='green', linewidth=2, markersize=5)
     ax2.set_xlabel('Wavelength (nm)')
@@ -353,20 +369,20 @@ def save_data(event):
     fig_save.savefig(png_path, dpi=300, facecolor='white', bbox_inches='tight')
     plt.close(fig_save)
     print(f"🎨 PNG saved: {png_path}")
-    messagebox.showinfo("Success", f"Sample '{name}' saved successfully.")
+    messagebox.showinfo("Success", f"Sample '{name}' saved with calibration.")
 
-# Assign callbacks
+# Asignar callbacks
 btn_ref.on_clicked(take_reference)
 btn_sample.on_clicked(measure_sample)
 btn_save.on_clicked(save_data)
 
-# === CONSOLE INSTRUCTIONS ===
+# === INSTRUCCIONES EN CONSOLA ===
 print("\n🟢 STEPS:")
 print("1. Place the blank (solvent) and click 'Take Reference'")
 print("2. Replace with sample and click 'Measure Sample'")
 print("3. Click 'Save' and enter a name in the popup\n")
 
-# === MAIN LOOP ===
+# === BUCLE PRINCIPAL ===
 try:
     while True:
         plt.pause(0.1)
