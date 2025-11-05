@@ -18,6 +18,18 @@ else:
     CORRECTION_FACTOR = np.ones(18)
     print("⚠️  No se encontró archivo de calibración. Usando factor = 1 (sin corrección).")
 
+# === FUNCIÓN DE VALIDACIÓN ===
+def lectura_es_valida(valores):
+    """
+    Valida una lectura del sensor.
+    Rechaza si el canal D (485 nm, índice 3) es cero o negativo.
+    """
+    if valores is None:
+        return False
+    if len(valores) != 18:
+        return False
+    return valores[3] > 0  # Canal D (485 nm) debe ser > 0
+
 # === SELECCIÓN DE PUERTO CON TKINTER ===
 def select_port_gui():
     root = tk.Tk()
@@ -105,6 +117,7 @@ except Exception as e:
 reference = None
 sample_intensity = None
 absorbance_values = None
+absorbance_std = None
 transmittance_percent = None
 count = 0
 
@@ -159,22 +172,12 @@ def read_spectrum():
         plt.pause(0.1)
     return None
 
-def take_n_readings_average(n=10):
-    readings = []
-    for i in range(n):
-        vals = read_spectrum()
-        if vals is not None:
-            readings.append(vals)
-        else:
-            print(f"⚠️ Reading #{i+1} failed.")
-        plt.pause(0.1)
-    return np.mean(readings, axis=0) if readings else None
-
 # === CONFIGURACIÓN DE LA GRÁFICA DOBLE ===
 plt.ion()
 fig, (ax_abs, ax_T) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [1, 1]})
 
-line_abs, = ax_abs.plot(wavelengths, [0]*18, 'o-', color='purple', linewidth=2, markersize=6)
+line_abs, = ax_abs.plot(wavelengths, [0]*18, 'o-', color='purple', linewidth=2, markersize=6, zorder=5)
+errorbars = ax_abs.errorbar(wavelengths, [0]*18, yerr=[0]*18, fmt='none', ecolor='red', capsize=3, capthick=1, elinewidth=1, zorder=4)
 ax_abs.set_ylabel('Absorbance (a.u.)')
 ax_abs.set_title('Absorbance')
 ax_abs.grid(True, alpha=0.3)
@@ -201,10 +204,14 @@ btn_sample = Button(ax_btn_sample, 'Measure Sample', color='lightgreen')
 ax_btn_save = plt.axes([0.6, 0.02, 0.2, 0.05])
 btn_save = Button(ax_btn_save, 'Save', color='gold')
 
+ax_btn_error = plt.axes([0.85, 0.02, 0.13, 0.05])
+btn_error = Button(ax_btn_error, 'Measure Error', color='orange')
+
 # === FUNCIONES DE BOTONES ===
 def take_reference(event):
-    global reference, absorbance_values, transmittance_percent
+    global reference, absorbance_values, absorbance_std, transmittance_percent
     absorbance_values = None
+    absorbance_std = None
     transmittance_percent = None
     line_abs.set_ydata([0]*18)
     line_T.set_ydata([0]*18)
@@ -219,27 +226,33 @@ def take_reference(event):
 
     plt.pause(5.0)
 
-    print("📊 Taking 10 averaged readings...")
-    ref_vals = take_n_readings_average(10)
+    print("📊 Taking valid readings (target: 10)...")
+    valid_readings = []
+    attempt = 0
+    while len(valid_readings) < 10 and attempt < 50:
+        vals = read_spectrum()
+        if lectura_es_valida(vals):
+            valid_readings.append(vals)
+            print(f"  ✅ Reading {len(valid_readings)}/10")
+        attempt += 1
+        plt.pause(0.1)
 
     if not turn_off_light():
         print("⚠️ Failed to turn off light.")
 
-    if ref_vals is None:
-        print("❌ No valid readings obtained.")
-        return
+    if len(valid_readings) < 10:
+        print(f"⚠️ Only got {len(valid_readings)} valid readings.")
+        if len(valid_readings) == 0:
+            print("❌ No valid reference.")
+            return
 
-    if np.max(ref_vals) < 10:
-        print("⚠️ WARNING: Very low signal. Is the LED on?")
-        return
-
-    reference = ref_vals
+    reference = np.mean(valid_readings, axis=0)
     print("✅ Reference saved.")
     ax_abs.set_title('Reference ready. Measure sample.', color='green')
     fig.canvas.draw_idle()
 
 def measure_sample(event):
-    global sample_intensity, absorbance_values, transmittance_percent
+    global sample_intensity, absorbance_values, absorbance_std, transmittance_percent
     if reference is None:
         print("⚠️ Take a reference first.")
         return
@@ -251,39 +264,44 @@ def measure_sample(event):
 
     plt.pause(5.0)
 
-    print("📊 Taking 10 averaged readings...")
-    samp_vals = take_n_readings_average(10)
+    print("📊 Taking valid readings (target: 10)...")
+    valid_readings = []
+    attempt = 0
+    while len(valid_readings) < 10 and attempt < 50:
+        vals = read_spectrum()
+        if lectura_es_valida(vals):
+            valid_readings.append(vals)
+            print(f"  ✅ Reading {len(valid_readings)}/10")
+        attempt += 1
+        plt.pause(0.1)
 
     if not turn_off_light():
         print("⚠️ Failed to turn off light.")
 
-    if samp_vals is None:
-        print("❌ No valid readings obtained.")
-        return
+    if len(valid_readings) < 10:
+        print(f"⚠️ Only got {len(valid_readings)} valid readings.")
+        if len(valid_readings) == 0:
+            print("❌ No valid sample.")
+            return
 
-    if np.max(samp_vals) < 10:
-        print("⚠️ WARNING: Low sample signal.")
-        return
-
-    sample_intensity = samp_vals
+    sample_intensity = np.mean(valid_readings, axis=0)
     I0 = reference
     I = sample_intensity
 
     I_safe = np.maximum(I, 1e-6)
     I0_safe = np.maximum(I0, I_safe)
 
-    # Calcular absorbancia original
     A_raw = np.log10(I0_safe / I_safe)
     A_raw = np.clip(A_raw, 0, None)
-
-    # Aplicar corrección espectral
     A_corrected = A_raw * CORRECTION_FACTOR
 
-    # Calcular transmitancia %
     T_percent = (I_safe / I0_safe) * 100
     T_percent = np.clip(T_percent, 0, 100)
 
-    # Actualizar gráficas con absorbancia CORREGIDA
+    absorbance_values = A_corrected
+    absorbance_std = None
+    transmittance_percent = T_percent
+
     line_abs.set_ydata(A_corrected)
     ax_abs.set_ylim(0, max(A_corrected)*1.2 or 2.0)
     ax_abs.relim(visible_only=True)
@@ -296,8 +314,10 @@ def measure_sample(event):
     ax_T.autoscale_view(scalex=False, scaley=True)
     ax_T.set_title('Transmittance', color='darkgreen')
 
-    absorbance_values = A_corrected
-    transmittance_percent = T_percent
+    global errorbars
+    errorbars.remove()
+    errorbars = ax_abs.errorbar(wavelengths, A_corrected, yerr=[0]*18, fmt='none', ecolor='red', capsize=3, capthick=1, elinewidth=1, zorder=4)
+
     fig.canvas.draw_idle()
     print("✅ Data updated (with calibration).")
 
@@ -331,7 +351,7 @@ def save_data(event):
     T_percent = (I / I0) * 100
     T_percent = np.clip(T_percent, 0, 100)
 
-    # --- GUARDAR CSV CON ABSORBANCIA CORREGIDA ---
+    # --- GUARDAR CSV ---
     csv_path = os.path.join(csv_folder, f"{filename}.csv")
     with open(csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
@@ -371,16 +391,84 @@ def save_data(event):
     print(f"🎨 PNG saved: {png_path}")
     messagebox.showinfo("Success", f"Sample '{name}' saved with calibration.")
 
+def measure_error(event):
+    global reference
+    if reference is None:
+        print("⚠️ First take a reference.")
+        messagebox.showwarning("Advertencia", "Primero toma una referencia.")
+        return
+
+    print("\n🔍 MEASURING ERROR (100 valid readings)...")
+    
+    if not turn_on_light():
+        print("❌ Failed to turn on light.")
+        messagebox.showerror("Error", "No se pudo encender el LED.")
+        return
+
+    plt.pause(5.0)
+
+    print("📊 Taking valid readings (target: 100)...")
+    all_A_raw = []
+    attempt = 0
+    while len(all_A_raw) < 100 and attempt < 500:
+        I = read_spectrum()
+        if lectura_es_valida(I):
+            I_safe = np.maximum(I, 1e-6)
+            I0_safe = np.maximum(reference, I_safe)
+            A_raw = np.log10(I0_safe / I_safe)
+            A_raw = np.clip(A_raw, 0, None)
+            A_corr = A_raw * CORRECTION_FACTOR
+            all_A_raw.append(A_corr)
+            if len(all_A_raw) % 20 == 0:
+                print(f"  ✅ {len(all_A_raw)}/100")
+        attempt += 1
+        plt.pause(0.01)
+
+    if not turn_off_light():
+        print("⚠️ Failed to turn off light.")
+
+    if len(all_A_raw) < 100:
+        print(f"⚠️ Only got {len(all_A_raw)} valid readings.")
+        if len(all_A_raw) == 0:
+            print("❌ No valid readings.")
+            return
+
+    all_A_raw = np.array(all_A_raw)
+    mean_A = np.mean(all_A_raw, axis=0)
+    std_A = np.std(all_A_raw, axis=0)
+
+    # Guardar CSV especial
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"error_measurement_{timestamp}"
+    csv_path = os.path.join(csv_folder, f"{filename}.csv")
+
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        header = ['Wavelength_nm', 'I0_Reference_uW_per_cm2']
+        header += [f'Absorbance_Reading_{i+1}' for i in range(100)]
+        header += ['Absorbance_Mean', 'Absorbance_Std']
+        writer.writerow(header)
+        for j in range(18):
+            row = [wavelengths[j], round(reference[j], 4)]
+            row += [round(all_A_raw[i][j], 4) for i in range(100)]
+            row += [round(mean_A[j], 4), round(std_A[j], 4)]
+            writer.writerow(row)
+
+    print(f"✅ CSV de error guardado: {csv_path}")
+    messagebox.showinfo("Éxito", f"Medición de error guardada:\n{csv_path}")
+
 # Asignar callbacks
 btn_ref.on_clicked(take_reference)
 btn_sample.on_clicked(measure_sample)
 btn_save.on_clicked(save_data)
+btn_error.on_clicked(measure_error)
 
 # === INSTRUCCIONES EN CONSOLA ===
 print("\n🟢 STEPS:")
 print("1. Place the blank (solvent) and click 'Take Reference'")
 print("2. Replace with sample and click 'Measure Sample'")
-print("3. Click 'Save' and enter a name in the popup\n")
+print("3. Click 'Save' to save normally")
+print("4. Click 'Measure Error' to take 100 VALID readings with full statistics\n")
 
 # === BUCLE PRINCIPAL ===
 try:
