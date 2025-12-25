@@ -398,7 +398,7 @@ def measure_error(event):
         messagebox.showwarning("Advertencia", "Primero toma una referencia.")
         return
 
-    print("\n🔍 MEASURING ERROR (100 valid readings)...")
+    print("\n🔍 MEASURING ERROR (10 valid readings)...")
     
     if not turn_on_light():
         print("❌ Failed to turn on light.")
@@ -407,10 +407,10 @@ def measure_error(event):
 
     plt.pause(5.0)
 
-    print("📊 Taking valid readings (target: 100)...")
+    print("📊 Taking valid readings (target: 10)...")
     all_A_raw = []
     attempt = 0
-    while len(all_A_raw) < 100 and attempt < 500:
+    while len(all_A_raw) < 10 and attempt < 500:
         I = read_spectrum()
         if lectura_es_valida(I):
             I_safe = np.maximum(I, 1e-6)
@@ -420,14 +420,14 @@ def measure_error(event):
             A_corr = A_raw * CORRECTION_FACTOR
             all_A_raw.append(A_corr)
             if len(all_A_raw) % 20 == 0:
-                print(f"  ✅ {len(all_A_raw)}/100")
+                print(f"  ✅ {len(all_A_raw)}/10")
         attempt += 1
         plt.pause(0.01)
 
     if not turn_off_light():
         print("⚠️ Failed to turn off light.")
 
-    if len(all_A_raw) < 100:
+    if len(all_A_raw) < 10:
         print(f"⚠️ Only got {len(all_A_raw)} valid readings.")
         if len(all_A_raw) == 0:
             print("❌ No valid readings.")
@@ -445,12 +445,12 @@ def measure_error(event):
     with open(csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         header = ['Wavelength_nm', 'I0_Reference_uW_per_cm2']
-        header += [f'Absorbance_Reading_{i+1}' for i in range(100)]
+        header += [f'Absorbance_Reading_{i+1}' for i in range(10)]
         header += ['Absorbance_Mean', 'Absorbance_Std']
         writer.writerow(header)
         for j in range(18):
             row = [wavelengths[j], round(reference[j], 4)]
-            row += [round(all_A_raw[i][j], 4) for i in range(100)]
+            row += [round(all_A_raw[i][j], 4) for i in range(10)]
             row += [round(mean_A[j], 4), round(std_A[j], 4)]
             writer.writerow(row)
 
@@ -468,7 +468,7 @@ print("\n🟢 STEPS:")
 print("1. Place the blank (solvent) and click 'Take Reference'")
 print("2. Replace with sample and click 'Measure Sample'")
 print("3. Click 'Save' to save normally")
-print("4. Click 'Measure Error' to take 100 VALID readings with full statistics\n")
+print("4. Click 'Measure Error' to take 10 VALID readings with full statistics\n")
 
 # === BUCLE PRINCIPAL ===
 try:
