@@ -56,10 +56,10 @@ Not included in the total (as in the article):
 | ESP32 pin | Connected to | Notes |
 |-----------|--------------|-------|
 | 3V3 | AS7265x 3.3V | Qwiic red wire |
-| GND | AS7265x GND, lamp switch GND | Common ground |
+| GND | AS7265x GND, relay module GND | Common ground |
 | GPIO 21 (SDA) | AS7265x SDA | Default ESP32 I²C bus |
 | GPIO 22 (SCL) | AS7265x SCL | Default ESP32 I²C bus |
-| GPIO 32 | Lamp switch input (e.g. relay module) | **Active-low**: `LOW` = lamp on, `HIGH` = lamp off |
+| GPIO 32 | Relay module input (switches the halogen lamp) | **Active-low**: `LOW` = lamp on, `HIGH` = lamp off |
 
 The on-board LEDs of the AS7265x are not used; only the external halogen lamp illuminates the sample.
 Place the lamp, the cuvette and the sensor on one optical axis inside the enclosure and keep the
