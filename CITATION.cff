@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+message: "If you use this hardware or software, please cite the article below."
+title: "Spectrophotometer-Software: System A (AS7265x multispectral spectrophotometer)"
+type: software
+license: MIT
+repository-code: "https://gitlab.com/fablab-ulb/projects/cuban-water-lab/spectrophotometer-software"
+authors:
+  - family-names: Rivera-Rivera
+    given-names: Alex M.
+  - family-names: Martinez-Ortiz
+    given-names: Daniela
+  - family-names: Quitin
+    given-names: François
+  - family-names: Terwagne
+    given-names: Denis
+  - family-names: Nicolis
+    given-names: Stamatios C.
+  - family-names: Altshuler
+    given-names: Ernesto
+  - family-names: Campo
+    given-names: Alexandre
+preferred-citation:
+  type: article
+  title: "Low-Cost Spectrophotometers: A Comparative Evaluation of Open-Source Architectures"
+  authors:
+    - family-names: Rivera-Rivera
+      given-names: Alex M.
+    - family-names: Martinez-Ortiz
+      given-names: Daniela
+    - family-names: Quitin
+      given-names: François
+    - family-names: Terwagne
+      given-names: Denis
+    - family-names: Nicolis
+      given-names: Stamatios C.
+    - family-names: Altshuler
+      given-names: Ernesto
+    - family-names: Campo
+      given-names: Alexandre
+  year: 2026
+  # TODO: fill in once available
+  # identifiers:
+  #   - type: other
+  #     value: "arXiv:XXXX.XXXXX"
+  #   - type: doi
+  #     value: "10.XXXX/XXXXX"
