@@ -4,7 +4,8 @@ Mechanical and electrical design files for System A.
 
 | File | Content |
 |------|---------|
-| _to be added_ | 3D-printable enclosure / cuvette holder (STL + source CAD) |
-| _to be added_ | Wiring diagram (ESP32, AS7265x, lamp switch) |
+| `system-a-enclosure.stl` | 3D-printable structure holding the AS7265x sensor, the 10 mm cuvette and the lamp on one optical axis (overall size ≈ 48 × 109 × 53 mm) |
+
+Wiring is described in the main [README](../README.md#wiring).
 
 All files in this folder are released under the MIT licence of the repository.
