@@ -4,11 +4,11 @@ const int ledPin = 32;
 
 void setup() {
   pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, HIGH); // Apagado (lógica invertida)
+  digitalWrite(ledPin, HIGH); // Lamp OFF (active-low output)
   Serial.begin(115200);
 
   if (sensor.begin() == false) {
-    Serial.println("Sensor no detectado.");
+    Serial.println("Sensor not detected.");
     while (1);
   }
 
@@ -24,7 +24,7 @@ void loop() {
       digitalWrite(ledPin, LOW);
       delay(100);
       Serial.println("LUZ_ENCENDIDA");
-      return; // ← Salir inmediatamente, sin medir
+      return; // Return immediately, without measuring
     }
     if (comando == "LIGHT_OFF") {
       digitalWrite(ledPin, HIGH);
@@ -36,7 +36,7 @@ void loop() {
 
 
   sensor.takeMeasurements();
-  // ... imprime los 18 valores calibrados
+  // Print the 18 calibrated channel values, sorted by wavelength (410-940 nm)
   Serial.print(sensor.getCalibratedA());
   Serial.print(",");
   Serial.print(sensor.getCalibratedB());

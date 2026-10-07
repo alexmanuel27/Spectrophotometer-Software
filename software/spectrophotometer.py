@@ -9,28 +9,28 @@ import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
 from matplotlib.widgets import Button
 
-# === CARGAR FACTOR DE CORRECCIÓN (si existe) ===
+# === LOAD OPTIONAL CORRECTION FACTOR (if present) ===
 CALIBRATION_FILE = "calibration_factor.npy"
 if os.path.exists(CALIBRATION_FILE):
     CORRECTION_FACTOR = np.load(CALIBRATION_FILE)
-    print(f"✅ Factor de corrección cargado desde {CALIBRATION_FILE}")
+    print(f"✅ Correction factor loaded from {CALIBRATION_FILE}")
 else:
     CORRECTION_FACTOR = np.ones(18)
-    print("⚠️  No se encontró archivo de calibración. Usando factor = 1 (sin corrección).")
+    print("⚠️  No calibration file found. Using factor = 1 (no correction).")
 
-# === FUNCIÓN DE VALIDACIÓN ===
+# === READING VALIDATION ===
 def lectura_es_valida(valores):
     """
-    Valida una lectura del sensor.
-    Rechaza si el canal D (485 nm, índice 3) es cero o negativo.
+    Validate one sensor reading.
+    Rejects it if channel D (485 nm, index 3) is zero or negative.
     """
     if valores is None:
         return False
     if len(valores) != 18:
         return False
-    return valores[3] > 0  # Canal D (485 nm) debe ser > 0
+    return valores[3] > 0  # Channel D (485 nm) must be > 0
 
-# === SELECCIÓN DE PUERTO CON TKINTER ===
+# === SERIAL PORT SELECTION (Tkinter) ===
 def select_port_gui():
     root = tk.Tk()
     root.withdraw()
@@ -77,7 +77,7 @@ def select_port_gui():
     root.destroy()
     return port
 
-# === EJECUTAR SELECCIÓN DE PUERTO ===
+# === RUN PORT SELECTION ===
 try:
     port = select_port_gui()
     if not port:
@@ -90,7 +90,7 @@ except Exception as e:
 baud_rate = 115200
 timeout = 2
 
-# === CARPETAS DE GUARDADO ===
+# === OUTPUT FOLDERS ===
 base_folder = os.path.expanduser("~/Descargas")
 csv_folder = os.path.join(base_folder, "Spectra_Absorbance_CSV")
 png_folder = os.path.join(base_folder, "Spectra_Absorbance_PNG")
@@ -98,14 +98,14 @@ png_folder = os.path.join(base_folder, "Spectra_Absorbance_PNG")
 os.makedirs(csv_folder, exist_ok=True)
 os.makedirs(png_folder, exist_ok=True)
 
-# === LONGITUDES DE ONDA EXACTAS (AS7265x) ===
+# === AS7265x CHANNEL CENTRE WAVELENGTHS (nm) ===
 wavelengths = [
     410, 435, 460, 485, 510, 535,
     560, 585, 610, 645, 680, 705,
     730, 760, 810, 860, 900, 940
 ]
 
-# === CONEXIÓN SERIAL ===
+# === SERIAL CONNECTION ===
 try:
     ser = serial.Serial(port, baud_rate, timeout=timeout)
     print(f"🔌 Connected to {port} at {baud_rate} bps")
@@ -113,7 +113,7 @@ except Exception as e:
     print(f"❌ Error opening serial port: {e}")
     exit(1)
 
-# === ESTADO DEL SISTEMA ===
+# === APPLICATION STATE ===
 reference = None
 sample_intensity = None
 absorbance_values = None
@@ -121,7 +121,7 @@ absorbance_std = None
 transmittance_percent = None
 count = 0
 
-# === FUNCIONES AUXILIARES ===
+# === HELPERS ===
 def clear_buffer():
     while ser.in_waiting > 0:
         ser.readline()
@@ -172,7 +172,7 @@ def read_spectrum():
         plt.pause(0.1)
     return None
 
-# === CONFIGURACIÓN DE LA GRÁFICA DOBLE ===
+# === DUAL PLOT SETUP ===
 plt.ion()
 fig, (ax_abs, ax_T) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [1, 1]})
 
@@ -194,7 +194,7 @@ ax_T.set_ylim(0, 100)
 
 fig.suptitle('🔬 Spectrophotometer - Calibrated', fontsize=14, fontweight='bold')
 
-# === BOTONES ===
+# === BUTTONS ===
 ax_btn_ref = plt.axes([0.1, 0.02, 0.2, 0.05])
 btn_ref = Button(ax_btn_ref, 'Take Reference', color='skyblue')
 
@@ -207,7 +207,7 @@ btn_save = Button(ax_btn_save, 'Save', color='gold')
 ax_btn_error = plt.axes([0.85, 0.02, 0.13, 0.05])
 btn_error = Button(ax_btn_error, 'Measure Error', color='orange')
 
-# === FUNCIONES DE BOTONES ===
+# === BUTTON CALLBACKS ===
 def take_reference(event):
     global reference, absorbance_values, absorbance_std, transmittance_percent
     absorbance_values = None
@@ -351,7 +351,7 @@ def save_data(event):
     T_percent = (I / I0) * 100
     T_percent = np.clip(T_percent, 0, 100)
 
-    # --- GUARDAR CSV ---
+    # --- SAVE CSV ---
     csv_path = os.path.join(csv_folder, f"{filename}.csv")
     with open(csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
@@ -366,7 +366,7 @@ def save_data(event):
             writer.writerow([w, round(i0, 4), round(i_samp, 4), round(a, 4), round(t, 2)])
     print(f"✅ CSV saved: {csv_path}")
 
-    # --- GUARDAR PNG LIMPIO ---
+    # --- SAVE CLEAN PNG ---
     png_path = os.path.join(png_folder, f"{filename}.png")
     fig_save, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
@@ -395,14 +395,14 @@ def measure_error(event):
     global reference
     if reference is None:
         print("⚠️ First take a reference.")
-        messagebox.showwarning("Advertencia", "Primero toma una referencia.")
+        messagebox.showwarning("Warning", "Take a reference first.")
         return
 
     print("\n🔍 MEASURING ERROR (10 valid readings)...")
     
     if not turn_on_light():
         print("❌ Failed to turn on light.")
-        messagebox.showerror("Error", "No se pudo encender el LED.")
+        messagebox.showerror("Error", "Could not switch the lamp on.")
         return
 
     plt.pause(5.0)
@@ -437,7 +437,7 @@ def measure_error(event):
     mean_A = np.mean(all_A_raw, axis=0)
     std_A = np.std(all_A_raw, axis=0)
 
-    # Guardar CSV especial
+    # Save repeatability CSV
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"error_measurement_{timestamp}"
     csv_path = os.path.join(csv_folder, f"{filename}.csv")
@@ -454,23 +454,23 @@ def measure_error(event):
             row += [round(mean_A[j], 4), round(std_A[j], 4)]
             writer.writerow(row)
 
-    print(f"✅ CSV de error guardado: {csv_path}")
-    messagebox.showinfo("Éxito", f"Medición de error guardada:\n{csv_path}")
+    print(f"✅ Repeatability CSV saved: {csv_path}")
+    messagebox.showinfo("Success", f"Repeatability measurement saved:\n{csv_path}")
 
-# Asignar callbacks
+# Register callbacks
 btn_ref.on_clicked(take_reference)
 btn_sample.on_clicked(measure_sample)
 btn_save.on_clicked(save_data)
 btn_error.on_clicked(measure_error)
 
-# === INSTRUCCIONES EN CONSOLA ===
+# === CONSOLE INSTRUCTIONS ===
 print("\n🟢 STEPS:")
 print("1. Place the blank (solvent) and click 'Take Reference'")
 print("2. Replace with sample and click 'Measure Sample'")
 print("3. Click 'Save' to save normally")
 print("4. Click 'Measure Error' to take 10 VALID readings with full statistics\n")
 
-# === BUCLE PRINCIPAL ===
+# === MAIN LOOP ===
 try:
     while True:
         plt.pause(0.1)
