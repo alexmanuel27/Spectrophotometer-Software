@@ -1,12 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+env/
+venv/
+.venv/
+
 # PyInstaller
 build/
 dist/
 *.spec
-
-# Binarios
 spectrophotometer
 spectrophotometer.exe
 
-# Entornos virtuales
-env/
-venv/
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Calibration against a reference instrument is not part of this repository
+calibration_data/
+calibrate_from_files.py
+calibration_lut.pkl
+calibration_factor.npy
+*.pkl
+*.npy
+
+# Measurement outputs
+Spectra_Absorbance_CSV/
+Spectra_Absorbance_PNG/
