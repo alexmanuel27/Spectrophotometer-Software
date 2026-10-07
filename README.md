@@ -37,7 +37,7 @@ Costs as reported in Table IV of the article (EUR, approximate).
 |-----------|-------------|-------|---------:|
 | **SparkFun Triad AS7265x** | 18-channel spectral sensor (410–940 nm), Qwiic/I²C. [SparkFun](https://www.sparkfun.com/sparkfun-triad-spectroscopy-sensor-as7265x-qwiic.html) | ![Triad](images/triad.webp) | 65.00 |
 | **ESP32 development board** | Microcontroller; talks to the sensor over I²C and to the PC over USB serial. | ![ESP32](images/esp32.jpg) | 8.00 |
-| **3D-printed enclosure + accessories** | Sensor/lamp/cuvette alignment structure (see `hardware/`). | | 10.00 |
+| **3D-printed enclosure + accessories** | Sensor/lamp/cuvette alignment structure ([`hardware/system-a-enclosure.stl`](hardware/system-a-enclosure.stl)). | | 10.00 |
 | **Wiring, PCB, power supply** | Jumper wires, lamp switch, USB cable, supply. | | 5.00 |
 | | | **Total** | **88.00** |
 
@@ -45,7 +45,7 @@ Not included in the total (as in the article):
 
 | Item | Notes |
 |------|-------|
-| **10 W halogen lamp** | Light source used for all measurements in the article. Switched by the ESP32 (GPIO 32). |
+| **10 W halogen lamp** | Light source used for all measurements in the article. Switched by the ESP32 (GPIO 32) through a relay module. ![Halogen lamp](images/halogen-lamp.jpg) |
 | **10 mm optical cuvettes** | Standard plastic cuvettes. ![Cuvette](images/holder.jpeg) |
 | Host computer | Windows, macOS or Linux, with a free USB port. |
 
